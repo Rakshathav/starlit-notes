@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Starlit Notes</title>
+<meta name="color-scheme" content="dark">
+<style>
+:root{color-scheme:dark;--bg:#070b1a;--fg:#e8ecff;--mut:#8a93b8;--acc:#ffd98a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:Georgia,"Times New Roman",serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+header{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;padding:14px 18px;pointer-events:none}
+h1{margin:0;font-size:1.25rem;letter-spacing:.12em;font-weight:400}
+p{margin:4px 0 0;color:var(--mut);font-size:.85rem}
+footer{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);display:flex;gap:8px;padding:12px;background:linear-gradient(transparent,var(--bg) 40%)}
+input{flex:1;min-width:0;background:#10173040;border:1px solid #2b3560;color:var(--fg);border-radius:10px;padding:11px 12px;font:inherit;font-size:1rem}
+input:disabled{opacity:.4}
+button{background:#141c3a;border:1px solid #2b3560;color:var(--acc);border-radius:10px;padding:0 14px;font:inherit}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header><h1>STARLIT NOTES</h1><p id="hint">Tap the sky to place a star.</p></header>
+<footer>
+<input id="note" placeholder="Select a star to write a note" disabled maxlength="60">
+<button id="clr">Clear</button>
+</footer>
+<script>
+(function(){
+var c=document.getElementById('c'),x=c.getContext('2d'),note=document.getElementById('note'),hint=document.getElementById('hint');
+var W,H,D=Math.min(window.devicePixelRatio||1,2),bg=[],shoot=null,sel=-1,S=[],L=[];
+try{var s=JSON.parse(localStorage.getItem('starlit')||'null');if(s){S=s.S||[];L=s.L||[];}}catch(e){}
+function save(){try{localStorage.setItem('starlit',JSON.stringify({S:S,L:L}));}catch(e){}}
+function size(){W=innerWidth;H=innerHeight;c.width=W*D;c.height=H*D;x.setTransform(D,0,0,D,0,0);}
+size();addEventListener('resize',size);
+for(var i=0;i<130;i++)bg.push({x:Math.random(),y:Math.random(),r:Math.random()*1.1+.3,p:Math.random()*6});
+function near(px,py){var b=-1,d=28;for(var i=0;i<S.length;i++){var dx=S[i].x*W-px,dy=S[i].y*H-py,k=Math.sqrt(dx*dx+dy*dy);if(k<d){d=k;b=i;}}return b;}
+function pick(i){sel=i;note.disabled=i<0;note.value=i<0?'':(S[i].t||'');note.placeholder=i<0?'Select a star to write a note':'Write a thought for this star';hint.textContent=i<0?'Tap the sky to place a star.':'Tap another star to link or unlink them.';}
+c.addEventListener('pointerdown',function(e){
+var h=near(e.clientX,e.clientY);
+if(h>=0){
+if(sel>=0&&sel!==h){var a=Math.min(sel,h),b=Math.max(sel,h),f=-1;
+for(var i=0;i<L.length;i++)if(L[i][0]===a&&L[i][1]===b)f=i;
+if(f>=0)L.splice(f,1);else L.push([a,b]);save();}
+pick(h);
+}else if(sel>=0&&S.length&&e.clientY>0&&false){}
+else{S.push({x:e.clientX/W,y:e.clientY/H,t:'',p:Math.random()*6});pick(S.length-1);save();}
+});
+note.addEventListener('input',function(){if(sel>=0){S[sel].t=note.value;save();}});
+note.addEventListener('keydown',function(e){if(e.key==='Enter'){note.blur();pick(-1);}});
+document.getElementById('clr').onclick=function(){S=[];L=[];pick(-1);save();};
+function star(px,py,r,a,col){x.globalAlpha=a;x.fillStyle=col;x.shadowColor=col;x.shadowBlur=r*5;x.beginPath();x.arc(px,py,r,0,6.283);x.fill();x.shadowBlur=0;}
+function frame(t){
+t/=1000;x.globalAlpha=1;x.clearRect(0,0,W,H);
+var g=x.createRadialGradient(W/2,H*1.1,0,W/2,H*1.1,H*1.2);g.addColorStop(0,'#1b2350');g.addColorStop(1,'#070b1a');x.fillStyle=g;x.fillRect(0,0,W,H);
+bg.forEach(function(b){star(b.x*W,b.y*H,b.r,.35+.35*Math.sin(t*1.5+b.p),'#cfd8ff');});
+if(!shoot&&Math.random()<.003)shoot={x:Math.random()*W*.8,y:Math.random()*H*.4,v:0};
+if(shoot){shoot.v+=.03;var sx=shoot.x+shoot.v*260,sy=shoot.y+shoot.v*120;x.globalAlpha=1-shoot.v;x.strokeStyle='#fff';x.lineWidth=1.5;x.beginPath();x.moveTo(sx,sy);x.lineTo(sx-50,sy-23);x.stroke();if(shoot.v>=1)shoot=null;}
+x.globalAlpha=.55;x.strokeStyle='#ffd98a';x.lineWidth=1;
+L.forEach(function(l){var a=S[l[0]],b=S[l[1]];if(!a||!b)return;x.beginPath();x.moveTo(a.x*W,a.y*H);x.lineTo(b.x*W,b.y*H);x.stroke();});
+x.font='13px Georgia,serif';x.textAlign='center';
+S.forEach(function(s,i){var px=s.x*W,py=s.y*H,on=i===sel;
+star(px,py,on?5:3.5,.8+.2*Math.sin(t*2+s.p),on?'#ffffff':'#ffd98a');
+if(on){x.globalAlpha=.5;x.strokeStyle='#fff';x.beginPath();x.arc(px,py,13+Math.sin(t*4)*2,0,6.283);x.stroke();}
+if(s.t){x.globalAlpha=.85;x.fillStyle='#e8ecff';x.fillText(s.t,px,py-14);}});
+x.globalAlpha=1;requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
